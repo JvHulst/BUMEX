@@ -1,0 +1,38 @@
+{
+    "alpha": 0.4,
+    "alpha_final": 0.025,
+    "gamma": 0.97,
+    "epsilon_initial": 1.0,
+    "epsilon_final": 0.001,
+    "delta": 0.05,
+    "c": 5.0,
+    "num_episodes": 10000,
+    "num_episodes_before_evaluation": 100,
+    "num_episodes_before_policy_update": 250,
+    "policy_choice": "exploring_policy",
+    "use_probabilistic_rewards": false,
+    "shaped_rewards": true,
+    "verbose_plotting": false,
+    "physics": {
+        "mass_pole_set": [0.05, 0.1, 0.2],
+        "dt": 0.02,
+        "num_simulation_samples": 20000000
+    },
+    "discretization": {
+        "bins": [8, 8, 14, 20],
+        "state_ranges": [
+            [-2.4, 2.4],
+            [-2.0, 2.0],
+            [-0.2094395, 0.2094395],
+            [-2.5, 2.5]
+        ],
+        "terminal_limits": {
+            "cart_position": [-2.4, 2.4],
+            "pole_angle": [-0.2094395, 0.2094395]
+        },
+        "observation_limits": {
+            "cart_position": [-4.8, 4.8],
+            "pole_angle": [-0.418, 0.418]
+        }
+    }
+}

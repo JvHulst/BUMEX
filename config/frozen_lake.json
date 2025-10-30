@@ -1,0 +1,15 @@
+{
+        "alpha": 0.05,
+        "gamma": 0.98,
+        "epsilon_initial": 1.0,
+        "epsilon_final": 0.01,
+        "delta": 0.05,
+        "c": 5.0,
+        "num_episodes": 5000,
+        "num_episodes_before_evaluation": 25,
+        "num_episodes_before_policy_update": 100,
+        "policy_choice": "exploring_policy",
+        "use_probabilistic_rewards": false,
+        "map_type": "4x4",
+        "verbose_plotting": false
+}

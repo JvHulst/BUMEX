@@ -1,0 +1,16 @@
+{
+    "alpha": 0.4,
+    "alpha_final": 0.01,
+    "gamma": 0.98,
+    "epsilon_initial": 1.0,
+    "epsilon_final": 0.01,
+    "delta": 0.05,
+    "c": 5.0,
+    "num_episodes": 5000,
+    "num_episodes_before_evaluation": 100,
+    "num_episodes_before_policy_update": 10000,
+    "policy_choice": "exploring_policy",
+    "use_probabilistic_rewards": true,
+    "use_exact_knowledge": false,
+    "verbose_plotting": false
+}
