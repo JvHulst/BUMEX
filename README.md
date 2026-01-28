@@ -2,8 +2,9 @@
 
 This repository contains the implementation of **BUMEX** (Bounded Uncertainty Model-based Exploration), a reinforcement learning method that uses prior model knowledge to guide exploration and accelerate learning.
 
-**📄 Paper:** [Smart Exploration in Reinforcement Learning Using Bounded Uncertainty Models](https://arxiv.org/abs/2504.05978)
-(2025 64th IEEE Conference on Decision and Control (CDC), Rio de Janeiro, Brazil)
+**📄 Paper:** [Smart Exploration in Reinforcement Learning Using Bounded Uncertainty Models](https://doi.org/10.1109/CDC57313.2025.11313018)
+
+Presented at the 2025 IEEE 64th Conference on Decision and Control (CDC), Rio de Janeiro, Brazil
 
 ## Overview
 
@@ -90,17 +91,18 @@ The codebase is functional with key features implemented. Ongoing consolidation 
 **If you use this code, please cite our paper:**
 
 ```bibtex
-@inproceedings{hulst2025,
-  title={Smart Exploration in Reinforcement Learning Using Bounded Uncertainty Models},
-  archivePrefix = {arXiv},
-  arxivId = {2504.05978},
-  eprint = {2504.05978},
-  author={van Hulst, J. S. and Heemels, W P M H and Antunes, D J},
-  booktitle={2025 64th IEEE Conference on Decision and Control (CDC)},
-  publisher = {IEEE},
-  url = {https://arxiv.org/abs/2504.05978},
-  year={2025}
+@inproceedings{vanHulst2025,
+title = {Smart Exploration in Reinforcement Learning Using Bounded Uncertainty Models},
+author = {van Hulst, J. S. and Heemels, W. P. M. H. and Antunes, D. J.},
+booktitle = {2025 IEEE 64th Conference on Decision and Control (CDC)},
+doi = {10.1109/CDC57313.2025.11313018},
+eprint = {arxiv.org/abs/2504.05978},
+month = {dec},
+pages = {5132--5138},
+publisher = {IEEE},
+url = {https://ieeexplore.ieee.org/document/11313018/},
+year = {2025}
 }
 ```
 
-**ArXiv preprint:** https://arxiv.org/abs/2504.05978
+**ArXiv version:** https://arxiv.org/abs/2504.05978
