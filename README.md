@@ -79,13 +79,6 @@ jupyter notebook notebooks/results_comparison.ipynb
 
 **Note:** While other solvers can be used with CVXPY, MOSEK provides significantly better performance for the convex optimization problems in BUMEX.
 
-## Current Status
-
-The codebase is functional with key features implemented. Ongoing consolidation includes:
-- Code cleanup and documentation improvements
-- Performance optimizations
-- Enhanced error handling
-
 ## Citation
 
 **If you use this code, please cite our paper:**
