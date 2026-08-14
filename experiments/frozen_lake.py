@@ -92,7 +92,8 @@ def main():
             
             # Plot final Q-bounds snapshot
             final_bounds_plot_path = os.path.join(run_dir, "Q_bounds_final.png")
-            plot_Q_bounds_snapshot(policy.Q_lower, policy.Q_upper, policy.Q, env, final_bounds_plot_path)
+            plot_Q_bounds_snapshot(policy.Q_lower, policy.Q_upper, policy.Q, env,
+                                   save_path=final_bounds_plot_path)
 
         env = gymnasium.make('FrozenLake-v1', is_slippery=True, map_name=map_type, render_mode='human')
         visual_run(env, policy)

@@ -91,13 +91,9 @@ def main():
             
             # Plot final Q-bounds snapshot
             final_bounds_plot_path = os.path.join(run_dir, "Q_bounds_final.png")
-            plot_Q_bounds_snapshot(policy.Q_lower, policy.Q_upper, policy.Q, env, 
-                                  final_bounds_plot_path, env_wrapper=policy.env_wrapper)
-            
-
-        # Perform one visual run on the environment with the policy
-        # env = gymnasium.make('Taxi-v3', render_mode='human')
-        # visual_run(env, policy)
+            plot_Q_bounds_snapshot(policy.Q_lower, policy.Q_upper, policy.Q, env,
+                                   env_wrapper=policy.env_wrapper,
+                                   save_path=final_bounds_plot_path)
 
     print(f"Experiment completed. Results saved to: {run_dir}")
 
