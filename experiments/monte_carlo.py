@@ -2,7 +2,6 @@
 Monte Carlo experiment runner for BUMEX.
 
 This module orchestrates multiple runs of experiments for statistical analysis.
-Adapted from monte_carlo_runs.ipynb to work with the new modular framework.
 """
 
 import os

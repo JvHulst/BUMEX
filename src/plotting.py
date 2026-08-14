@@ -617,7 +617,7 @@ def plot_results_comparison(results_folders, experiment_names, colors=None, save
     matplotlib.rcParams['font.family'] = 'Times New Roman'
     matplotlib.rcParams['font.serif'] = ['Computer Modern']
 
-    plt.figure(figsize=(8, 5))
+    plt.figure(figsize=(4, 3))
     
     for idx, (folder, name) in enumerate(zip(results_folders, experiment_names)):
         base_name = os.path.basename(folder)
@@ -647,7 +647,7 @@ def plot_results_comparison(results_folders, experiment_names, colors=None, save
     
     plt.xlabel('Training Episodes')
     plt.ylabel('Average Greedy Return')
-    plt.legend()
+    # plt.legend()
     plt.tight_layout()
     if axis_mode == 'log':
         plt.yscale('log')
@@ -667,27 +667,6 @@ def plot_results_comparison(results_folders, experiment_names, colors=None, save
         plt.savefig(f'{save_path}.svg', format='svg', bbox_inches='tight')
     
     plt.show()
-
-
-def _plot_Q_bounds_snapshot_taxi(Q_lower, Q_upper, Q, env, save_path=None):
-    """
-    Plot Q-bounds snapshot for Taxi environment.
-    
-    Args:
-        Q_lower (np.ndarray): Lower Q-bounds
-        Q_upper (np.ndarray): Upper Q-bounds
-        Q (np.ndarray): Current Q-values
-        env: Taxi environment
-        save_path (str, optional): Path to save plot
-    """
-    #TODO: Implement Taxi-specific Q-bounds visualization
-    # Challenge: 4D state space (500 states) requires creative visualization
-    # Possible approaches:
-    # 1. Aggregate over passenger/destination dimensions
-    # 2. Show specific slices (e.g. passenger in taxi, specific destination)
-    # 3. Heatmap showing Q-values for taxi positions with passenger states
-    print("Taxi Q-bounds snapshot plotting not yet implemented")
-    pass
 
 
 def plot_taxi_greedy_policy(policy, env, save_path=None):

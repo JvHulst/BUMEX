@@ -21,7 +21,7 @@ BUMEX leverages bounded uncertainty models to compute Q-function bounds via conv
 
 ```bash
 # Install dependencies
-pip install numpy matplotlib cvxpy gymnasium scipy mosek
+pip install numpy matplotlib gymnasium scipy
 
 # Run single experiments
 python experiments/frozen_lake.py
@@ -41,6 +41,7 @@ jupyter notebook notebooks/results_comparison.ipynb
 ├── experiments/               # Experiment runners
 ├── src/                       # Core implementations
 │   ├── exploring_policy.py    # BUMEX implementation
+│   ├── fast_regularized.py    # Solver for the regularized Q-bound problem
 │   ├── epsilon_greedy.py      # Baseline policies
 │   ├── ucb1.py
 │   ├── ucrl2.py
@@ -48,6 +49,7 @@ jupyter notebook notebooks/results_comparison.ipynb
 │   ├── *_wrapper.py           # Environment interfaces
 │   └── utils.py               # Utilities
 ├── config/                    # JSON configuration files  
+├── tests/                     # Solver checks
 └── notebooks/                 # Visualization of results
 ```
 
@@ -68,16 +70,20 @@ jupyter notebook notebooks/results_comparison.ipynb
 - Slightly more complicated grid-world benchmark for tabular RL methods
 - BUMEX uses model set that models adjacency in grid world and has an uncertain reward model
 
+## Q-bound solver
+
+Each Q-bound update optimizes, for every state-action pair, a transition distribution over a box and the simplex with a KL penalty towards the empirical distribution. This inner problem is separable with a single coupling constraint, so it admits a closed-form dual reduction; a general conic solver is therefore unnecessary, and exploiting the structure is worth roughly two orders of magnitude. `src/fast_regularized.py` is a purpose-built solver for it, using a closed-form fill where the regularization vanishes and a bisection on the dual multiplier elsewhere, and solving all state-action pairs of a sweep as one vectorized batch.
+
+The problem is an instance of singly-constrained separable convex resource allocation, surveyed in Patriksson, *A survey on the continuous nonlinear resource allocation problem*, European Journal of Operational Research 185(1), 2008.
+
+`python tests/test_fast_regularized.py` checks the solution against SciPy, against the closed form at zero regularization, and against the KKT conditions.
+
 ## Dependencies
 
 - `numpy`: Numerical computations
-- `cvxpy`: Convex optimization for Q-bounds computation  
-- `mosek`: High-performance optimization solver (recommended for best performance)
 - `gymnasium`: RL environments
 - `scipy`: Spatial computations
 - `matplotlib`: Visualization
-
-**Note:** While other solvers can be used with CVXPY, MOSEK provides significantly better performance for the convex optimization problems in BUMEX.
 
 ## Citation
 

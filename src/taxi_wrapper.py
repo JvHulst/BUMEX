@@ -216,108 +216,40 @@ class TaxiWrapper:
     def get_possible_next_states(self, state, action):
         """
         Get all possible next states from current state and action.
-        Incorporates uncertainty about wall locations and action failures.
-        
+
+        Taxi movement, pickup and dropoff all resolve deterministically, so each
+        (state, action) has exactly one successor. The uncertainty the policy
+        works with sits in the reward model instead.
+
         Args:
             state (int): Current state
             action (int): Action
-            
+
         Returns:
             list: List of possible next states
         """
-        taxi_row, taxi_col, passenger_loc, dest_idx = self.decode_state(state)
-        possible_states = []
-
-        # The intended move (deterministic result)
-        intended_next_state = self.get_deterministic_next_state(state, action)
-        possible_states.append(intended_next_state)
-        
-        # Movement actions: consider wall uncertainty
-        # if action <= 3:  # Movement actions
-            
-        #     # Due to wall uncertainty, movement might be blocked
-        #     # In that case, taxi stays in current position
-        #     if intended_next_state != state:  # Only if movement was possible
-        #         if taxi_row != 2:       # No walls in middle row
-        #             if action >= 2:     # Walls are only vertical
-        #                 possible_states.append(state)  # Staying in place due to wall
-
-        # # Pickup/Dropoff actions: consider action failure uncertainty
-        # elif action == 4:  # Pickup
-        #     if self.is_legal_pickup(state):
-        #         # Pickup might succeed
-        #         success_state = self.encode_state(taxi_row, taxi_col, 4, dest_idx)
-        #         possible_states.append(success_state)
-        #     # Pickup might fail (or conditions not met)
-        #     else:
-        #         possible_states.append(state)
-
-        # elif action == 5:  # Dropoff
-        #     intended_next_state = self.get_deterministic_next_state(state, action)
-        #     possible_states.append(intended_next_state)
-        #     # if self.is_legal_dropoff(state):
-        #     #     # Dropoff might succeed
-        #     #     dropoff_locations = [(0, 0), (0, 4), (4, 0), (4, 3)]  # R, G, Y, B
-        #     #     current_location = None
-        #     #     for i, (loc_row, loc_col) in enumerate(dropoff_locations):
-        #     #         if taxi_row == loc_row and taxi_col == loc_col:
-        #     #             current_location = i
-        #     #             break
-        #     #     success_state = self.encode_state(taxi_row, taxi_col, current_location, dest_idx)
-        #     #     possible_states.append(success_state)
-        #     # # Dropoff might fail (or conditions not met)
-        #     # else:
-        #     #     possible_states.append(state)
-        
-        # Remove duplicates while preserving order
-        unique_states = []
-        for s in possible_states:
-            if s not in unique_states:
-                unique_states.append(s)
-        
-        return unique_states
+        return [self.get_deterministic_next_state(state, action)]
     
-    def generate_P_bounds(self, min_intended_probability=0.0):
+    def generate_P_bounds(self):
         """
         Generate transition probability bounds for Taxi environment.
-        Incorporates uncertainty about wall locations and action failures.
-        
-        Args:
-            min_intended_probability (float): Minimum probability for intended transitions
-                                            OLD UNCERTAIN VALUE: 0.7, NEW EXACT VALUE: 1.0
-        
+
+        The single successor of each (state, action) gets an upper bound of one.
+        Lower bounds stay at the default of zero, so the transition model is
+        treated as unknown until the visit counts fill it in.
+
         Returns:
             tuple: (P_lower, P_upper) probability bound dictionaries
         """
         # Initialize with defaultdict for memory efficiency (default 0.0)
         P_lower = defaultdict(float)
         P_upper = defaultdict(float)
-        
+
         for state in range(self.n_states):
             for action in range(self.n_actions):
-                # Get all possible next states considering uncertainty
-                possible_next_states = self.get_possible_next_states(state, action)
-                
-                # Set upper bounds: all possible transitions could occur
-                for next_state in possible_next_states:
+                for next_state in self.get_possible_next_states(state, action):
                     P_upper[(state, action, next_state)] = 1.0
-                
-                # # Set lower bounds: intended action has minimum probability
-                # intended_next_state = self.get_deterministic_next_state(state, action)
-                # # OLD UNCERTAIN VALUE: min_intended_probability = 0.7
-                # # NEW EXACT VALUE: min_intended_probability = 1.0 (deterministic)
-                # P_lower[(state, action, intended_next_state)] = min_intended_probability
-                
-                # # For actions that might fail, distribute remaining probability
-                # if len(possible_next_states) > 1:
-                #     # Some probability that action fails (stays in current state)
-                #     if state in possible_next_states and state != intended_next_state:
-                #         failure_probability = 1.0 - min_intended_probability
-                #         # Set a small lower bound for failure case
-                #         # OLD UNCERTAIN VALUE: min(0.1, 0.3) = 0.1 when min_intended = 0.7
-                #         # NEW EXACT VALUE: min(0.1, 0.0) = 0.0 when min_intended = 1.0
-                #         P_lower[(state, action, state)] = min(0.0, failure_probability)
-        
+
         return P_lower, P_upper
     
     def _get_exact_reward(self, state, action):
@@ -557,12 +489,7 @@ class TaxiWrapper:
         else:
             # Store deterministic reward
             deterministic_rewards[(state, action)] = reward
-            
-            # # Handle terminal states
-            # if is_terminal:
-            #     for a in range(self.n_actions):
-            #         deterministic_rewards[(next_state, a)] = 0
-            
+
             return reward_params, deterministic_rewards
     
     def initialize_transition_priors(self):

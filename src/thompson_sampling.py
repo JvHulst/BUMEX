@@ -107,14 +107,6 @@ class ThompsonSamplingPolicy:
             self.reward_params, self.deterministic_rewards, self.use_probabilistic_rewards
         )
     
-    def _is_terminal_state(self, state):
-        """
-        Check if a state is terminal using environment wrapper.
-        """
-        if not self.env_wrapper:
-            raise ValueError("Environment wrapper is required for terminal state detection")
-        return self.env_wrapper.is_terminal(state)
-
     def sample_mdp(self):
         """Sample an MDP from the posterior distribution."""
         n_states = self.env.observation_space.n

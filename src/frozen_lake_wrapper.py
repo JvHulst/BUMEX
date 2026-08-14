@@ -52,21 +52,6 @@ class FrozenLakeWrapper:
         i, j = divmod(state, self.grid_size)
         return self.grid[i, j] == 'G'
     
-    def get_reward(self, state, action, next_state):
-        """
-        Get reward for transition (s, a, s').
-        
-        Args:
-            state (int): Current state
-            action (int): Action taken
-            next_state (int): Next state
-            
-        Returns:
-            float: Reward for this transition
-        """
-        # FrozenLake: reward 1 only when reaching goal, 0 otherwise
-        return 1.0 if self.is_goal(next_state) else 0.0
-    
     def get_deterministic_next_state(self, state, action):
         """
         Get deterministic next state (intended direction without slipping).

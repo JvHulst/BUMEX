@@ -5,9 +5,10 @@ This module implements our novel uncertainty-aware exploration strategy using Q-
 """
 
 import numpy as np
-import cvxpy as cp
 import random
 from collections import defaultdict
+
+from fast_regularized import solve_batch
 
 
 class ExploringPolicy:
@@ -129,12 +130,7 @@ class ExploringPolicy:
         
         # Update reward bounds based on observed reward
         self.R_lower, self.R_upper = self.env_wrapper.update_reward_bounds(state, action, next_state, reward, self.R_lower, self.R_upper)
-        
-        # Clip Q-values to stay within bounds
-        # self.Q[state, action] = max(self.Q[state, action], self.Q_lower[state, action])
-        # self.Q[state, action] = min(self.Q[state, action], self.Q_upper[state, action])
-        
-    
+
     def update_epsilon(self):
         """Update epsilon using exponential decay."""
         self.epsilon = self.epsilon * self.epsilon_decay
@@ -147,14 +143,6 @@ class ExploringPolicy:
         """Return status information for logging."""
         return {"epsilon": f"{self.epsilon:.4f}", "alpha": f"{self.alpha:.4f}"}
 
-    def update_Q_bounds_periodic(self):
-        """Update Q-bounds using current visit counts."""
-        self.Q_lower, self.Q_upper = self.update_Q_bounds(tol=1e-1)
-        
-        # Clip current Q-values to updated bounds
-        self.Q = np.maximum(self.Q, self.Q_lower)
-        self.Q = np.minimum(self.Q, self.Q_upper)
-    
     def _beta(self, state, action):
         """
         Computes beta(x,u) = (( max(0, Q_upper(x,u) - V_lower(x) ) )^2) / ( 2*(Q_upper(x,u) - Q_lower(x,u)) )
@@ -189,102 +177,6 @@ class ExploringPolicy:
         # Otherwise (guaranteed suboptimal or completely certain but not guaranteed optimal), assign zero weight. This value is the 'zeta' varialbe in the paper
         return 1e-8  # Small positive value to keep exploring all actions in case true model is not within regularized bounds.
     
-    def _regularized_probability_transition_optimization(self, lower_vec, upper_vec, p_data_vec, V_vec, lambda_reg, opt_type='min', solver=cp.MOSEK):
-        """
-        Solves for the optimal next-state probability distribution p using regularization.
-        For opt_type='min': minimizes sum(p*V) + lambda_reg * KL(p_data || p)
-        For opt_type='max': maximizes sum(p*V) - lambda_reg * sum(p_data * log(p))
-        Returns the optimal p.
-
-        Args:
-            lower_vec (np.ndarray): Lower bounds on transition probabilities
-            upper_vec (np.ndarray): Upper bounds on transition probabilities
-            p_data_vec (np.ndarray): Empirical transition probabilities
-            V_vec (np.ndarray): Value vector for next possible states
-            lambda_reg (float): Regularization parameter
-        opt_type (str): 'min' for minimization, 'max' for maximization
-        solver (str): CVXPY solver to use
-        
-        """
-        n = len(V_vec)
-
-        if not opt_type in ['min', 'max']:
-            raise ValueError(f"Unknown optimization type: {opt_type}")
-
-        # Use closed-form solution if lambda_reg is 0
-        if lambda_reg == 0:
-            p_opt = lower_vec.copy()
-            if opt_type == 'min':
-                sorted_indices = np.argsort(V_vec)
-            else:
-                sorted_indices = np.argsort(V_vec)[::-1]
-            
-            for i in range(n):
-                if np.sum(p_opt) >= 1:
-                    break
-                remaining_budget = 1 - np.sum(p_opt)
-                p_opt[sorted_indices[i]] += min(remaining_budget, upper_vec[sorted_indices[i]] - lower_vec[sorted_indices[i]])
-            return p_opt
-
-        p = cp.Variable(n)
-        xi = 1e-8   # small positive value to ensure numerical stability
-        if opt_type == 'min':
-            objective = cp.sum(cp.multiply(p, V_vec)) + lambda_reg * cp.sum(cp.rel_entr(p_data_vec, p))
-            prob = cp.Problem(cp.Minimize(objective),
-                              [p >= lower_vec, p <= upper_vec, cp.sum(p) == 1, p >= xi])
-        else:
-            objective = cp.sum(cp.multiply(p, V_vec)) + lambda_reg * cp.sum(cp.multiply(p_data_vec, cp.log(p)))
-            prob = cp.Problem(cp.Maximize(objective),
-                              [p >= lower_vec, p <= upper_vec, cp.sum(p) == 1, p >= xi])
-        try:
-            if solver==None:
-                prob.solve()
-            else:
-                prob.solve(solver=solver)
-        except Exception as e:
-            raise RuntimeError(f"Optimization failed: {e}")
-        if p.value is None: 
-            raise RuntimeError("Optimization solver returned None - no feasible solution found")
-        p_opt = p.value
-
-        if False:
-            # debugging figure
-            p_opt = p.value
-            # Create a figure with dual y-axes
-            import matplotlib.pyplot as plt
-
-            fig, ax1 = plt.subplots(figsize=(12, 6))
-
-            # First y-axis for probability vectors
-            x = np.arange(len(p_opt))
-            ax1.plot(x, lower_vec, 'r--', label='lower_vec', linewidth=2)
-            ax1.plot(x, upper_vec, 'b--', label='upper_vec', linewidth=2)
-            ax1.plot(x, p_data_vec, 'g-', label='p_data_vec', marker='o', markersize=4)
-            ax1.plot(x, p_opt, 'k-', label='p_opt', marker='s', markersize=4, linewidth=2)
-
-            ax1.set_xlabel('Index')
-            ax1.set_ylabel('Probability', color='black')
-            ax1.tick_params(axis='y', labelcolor='black')
-            ax1.grid(True, alpha=0.3)
-
-            # Second y-axis for V_vec
-            ax2 = ax1.twinx()
-            ax2.plot(x, V_vec, 'm-', label='V_vec', marker='^', markersize=4, linewidth=2, alpha=0.7)
-            ax2.set_ylabel('Value (V_vec)', color='magenta')
-            ax2.tick_params(axis='y', labelcolor='magenta')
-
-            # Combine legends from both axes
-            lines1, labels1 = ax1.get_legend_handles_labels()
-            lines2, labels2 = ax2.get_legend_handles_labels()
-            ax1.legend(lines1 + lines2, labels1 + labels2, loc='best')
-
-
-            plt.title(f'Transition probabilities {opt_type}imized (lambda_reg={lambda_reg:.4f})')
-            plt.tight_layout()
-            plt.show()
-
-        return p_opt
-    
     def _compute_lambda(self, default_lambda=0.0):
         """
         Compute a data-driven regularization parameter lambda for each (state, action) pair.
@@ -310,94 +202,128 @@ class ExploringPolicy:
 
         return lambdas
     
+    def _bound_structure(self):
+        """
+        Index the possible next states of every non-terminal (state, action).
+
+        Returns the state and action of each pair, the indices of its possible
+        next states padded into a rectangular array, the mask marking the real
+        entries, and the transition probability bounds laid out the same way.
+
+        The transition structure and the probability bounds follow from P_lower
+        and P_upper, which are fixed for the whole run, so this is built once and
+        reused by every later bound update.
+        """
+        if getattr(self, '_cached_structure', None) is not None:
+            return self._cached_structure
+
+        n_states = self.env.observation_space.n
+        n_actions = self.env.action_space.n
+        is_terminal = self.env_wrapper.is_terminal
+
+        pairs, next_states = [], []
+        for s in range(n_states):
+            if is_terminal(s):
+                continue
+            for a in range(n_actions):
+                ns_list = self.env_wrapper.get_possible_next_states(s, a)
+
+                # A pair the model set never reached gets a single successor from
+                # one physics step at the nominal pole mass. That successor
+                # carries no model uncertainty, unlike the rest of the bounds,
+                # which are built from the whole mass_pole_set.
+                if len(ns_list) == 0 and "CartPole" in self.env.unwrapped.spec.id:
+                    s_cont = self.env.get_continuous_from_discrete(s)
+                    ns_list = [self.env.discretize_state(
+                        self.env_wrapper._simulate_physics(s_cont, a))]
+                if len(ns_list) == 0:
+                    continue
+                pairs.append((s, a))
+                next_states.append(list(ns_list))
+
+        width = max(len(ns) for ns in next_states)
+        ns_index = np.zeros((len(pairs), width), dtype=np.intp)
+        mask = np.zeros((len(pairs), width), dtype=bool)
+        p_lower = np.zeros((len(pairs), width))
+        p_upper = np.zeros((len(pairs), width))
+        for row, ((s, a), ns_list) in enumerate(zip(pairs, next_states)):
+            k = len(ns_list)
+            ns_index[row, :k] = ns_list
+            mask[row, :k] = True
+            p_lower[row, :k] = [self.P_lower.get((s, a, ns), 0.0) for ns in ns_list]
+            p_upper[row, :k] = [self.P_upper.get((s, a, ns), 1.0) for ns in ns_list]
+
+        states = np.array([s for s, _ in pairs], dtype=np.intp)
+        actions = np.array([a for _, a in pairs], dtype=np.intp)
+        self._cached_structure = (states, actions, ns_index, mask, p_lower, p_upper)
+        return self._cached_structure
+
     def update_Q_bounds(self, tol=1e-2, max_iter=500):
         """
         Update Q-bounds using regularized optimization.
         Performs iterative optimization starting from current self.Q_lower and self.Q_upper.
+
+        Each sweep solves the regularized transition optimization for every
+        (state, action) pair at once, so a sweep costs two batched solves rather
+        than one solver call per pair.
         """
         if not self.env_wrapper:
             raise ValueError("Environment wrapper is required for compute_Q_bounds")
-            
+
         n_states = self.env.observation_space.n
         n_actions = self.env.action_space.n
-        
-        # Use wrapper functions
-        is_terminal = self.env_wrapper.is_terminal
-        
+
+        states, actions, ns_index, mask, p_lower, p_upper = self._bound_structure()
+
         # Use current Q-bounds as starting point
         Q_lower = np.copy(self.Q_lower)
         Q_upper = np.copy(self.Q_upper)
 
         lambdas = self._compute_lambda()
+        lam = lambdas[states, actions]
 
-        # Initialize counter for state-action pairs with no transitions
-        no_transitions_counter = 0
+        # Empirical transition distribution per pair, uniform where unvisited.
+        counts = np.zeros_like(p_lower)
+        for row, (s, a) in enumerate(zip(states, actions)):
+            counts[row, mask[row]] = [self.visit_counts.get((s, a, ns), 0)
+                                      for ns in ns_index[row, mask[row]]]
+        totals = counts.sum(axis=1, keepdims=True)
+        uniform = mask / np.maximum(mask.sum(axis=1, keepdims=True), 1)
+        p_data = np.where(totals > 0, counts / np.where(totals > 0, totals, 1.0), uniform)
+
+        # Reward bounds are refined during training, so they are read afresh here.
+        R_lower = np.array([[self.R_lower[(s, a)] for a in range(n_actions)]
+                            for s in range(n_states)])
+        R_upper = np.array([[self.R_upper[(s, a)] for a in range(n_actions)]
+                            for s in range(n_states)])
+        terminal = np.array([self.env_wrapper.is_terminal(s) for s in range(n_states)])
+        r_lower = R_lower[states, actions]
+        r_upper = R_upper[states, actions]
 
         # Q-iteration over bounds.
         for it in range(max_iter):
-            delta = 0.0
-            Q_lower_new = np.copy(Q_lower)
-            Q_upper_new = np.copy(Q_upper)
             # First, compute value functions.
             V_lower = np.max(Q_lower, axis=1)
             V_upper = np.max(Q_upper, axis=1)
+            V_lower_mat = np.where(mask, V_lower[ns_index], 0.0)
+            V_upper_mat = np.where(mask, V_upper[ns_index], 0.0)
 
-            #TODO: we can be more clever here. Some state-action pairs are more important to the Q-updates than others. Can we sort them? Can we visit the more important ones more frequently through some kind of weighted sampling?
-            for s in np.random.permutation(n_states):
-                if is_terminal(s):
-                    # Update only the first iteration since subsequent iterations will not change anything for terminal states.
-                    if it == 0:
-                        # Terminal states: Q-values are just the immediate reward (no future value)
-                        for a in range(n_actions):
-                            Q_lower_new[s, a] = self.R_lower[(s, a)]
-                            Q_upper_new[s, a] = self.R_upper[(s, a)]
+            p_opt_lower = solve_batch(p_lower, p_upper, p_data, V_lower_mat, lam, mask, 'min')
+            p_opt_upper = solve_batch(p_lower, p_upper, p_data, V_upper_mat, lam, mask, 'max')
 
-                            delta = max(delta, abs(Q_lower_new[s, a] - Q_lower[s, a]), abs(Q_upper_new[s, a] - Q_upper[s, a]))
-                            
-                    # Already assigned for all actions, so skip to next state
-                    continue
-                    
-                for a in np.random.permutation(n_actions):
-                    # Use wrapper to get possible next states
-                    ns_list = self.env_wrapper.get_possible_next_states(s, a)
+            Q_lower_new = np.copy(Q_lower)
+            Q_upper_new = np.copy(Q_upper)
+            Q_lower_new[states, actions] = r_lower + self.gamma * np.sum(p_opt_lower * V_lower_mat, axis=1)
+            Q_upper_new[states, actions] = r_upper + self.gamma * np.sum(p_opt_upper * V_upper_mat, axis=1)
 
-                    # if ns_list is empty, simulate the dynamics to find a next state
-                    #TODO: this is a bit of a hack. Perhaps we should compute based on all pole_masses such that we properly account for model uncertainty.
-                    if len(ns_list) == 0 and "CartPole" in self.env.unwrapped.spec.id:
-                        s_cont = self.env.get_continuous_from_discrete(s)
-                        s_next_cont = self.env_wrapper._simulate_physics(s_cont, a)
-                        ns = self.env.discretize_state(s_next_cont)
-                        ns_list = [ns]
-                        no_transitions_counter += 1
-                    
-                    # Build probability bound vectors.
-                    lower_vec = np.array([self.P_lower.get((s, a, ns), 0.0) for ns in ns_list])
-                    upper_vec = np.array([self.P_upper.get((s, a, ns), 1.0) for ns in ns_list])
-                    counts = np.array([self.visit_counts.get((s, a, ns), 0) for ns in ns_list])
-                    if counts.sum() == 0:
-                        p_data_vec = np.full(len(ns_list), 1/len(ns_list))
-                    else:
-                        p_data_vec = counts / counts.sum()
-                    
-                    # Build value vectors.
-                    V_lower_vec = np.array([V_lower[ns] for ns in ns_list])
-                    V_upper_vec = np.array([V_upper[ns] for ns in ns_list])
-                    
-                    # Optimize for lower bound.
-                    p_opt_lower = self._regularized_probability_transition_optimization(lower_vec, upper_vec, p_data_vec,
-                                                      V_lower_vec, lambdas[s,a], opt_type='min', solver = cp.MOSEK)
-                    candidate_lower = self.R_lower[(s, a)] + self.gamma * np.dot(p_opt_lower, V_lower_vec)
-                    
-                    # Optimize for upper bound.
-                    p_opt_upper = self._regularized_probability_transition_optimization(lower_vec, upper_vec, p_data_vec,
-                                                      V_upper_vec, lambdas[s,a], opt_type='max', solver = cp.MOSEK)
-                    candidate_upper = self.R_upper[(s, a)] + self.gamma * np.dot(p_opt_upper, V_upper_vec)
-                    
-                    Q_lower_new[s, a] = candidate_lower
-                    Q_upper_new[s, a] = candidate_upper
-                    
-                    delta = max(delta, abs(Q_lower_new[s, a] - Q_lower[s, a]), abs(Q_upper_new[s, a] - Q_upper[s, a]))
+            # Terminal states carry the immediate reward only, with no future
+            # value, so they are assigned once and never change afterwards.
+            if it == 0 and terminal.any():
+                Q_lower_new[terminal] = R_lower[terminal]
+                Q_upper_new[terminal] = R_upper[terminal]
 
+            delta = max(np.max(np.abs(Q_lower_new - Q_lower)),
+                        np.max(np.abs(Q_upper_new - Q_upper)))
             Q_lower, Q_upper = Q_lower_new, Q_upper_new
 
             # Progress reporting every 1% of the total iterations
@@ -411,13 +337,13 @@ class ExploringPolicy:
             # print statement if it is the last iteration and tolerance is not reached
             if it == max_iter - 1:
                 print(f"Warning: Q-bound iterations reached max_iter={max_iter} without convergence (delta={delta:.6f})")
-        
+
         # Save optimized Q-bounds if significant computation was performed (more than 5 iterations)
         # and we're using a wrapper with a save_Q_bounds method and all lambda values are 0
         if it > 5 and hasattr(self.env_wrapper, 'save_Q_bounds') and not np.any(lambdas > 0):
             print(f"Saving optimized Q-bounds after {it+1} iterations...")
             self.env_wrapper.save_Q_bounds(Q_lower, Q_upper)
-        
+
         self.Q_lower = Q_lower
         self.Q_upper = Q_upper
 

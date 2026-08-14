@@ -92,14 +92,12 @@ class FiniteAbstractionWrapper(gymnasium.Wrapper):
         dims = tuple(len(bins) + 1 for bins in self.state_bins)
         bin_indices = np.unravel_index(discrete_state, dims)
 
-        # Convert bin indices to continuous values (use same logic as old find_center)
+        # Convert bin indices to the continuous value at the centre of each bin.
+        # The two outer bins are unbounded, so their centre is extrapolated half a
+        # spacing beyond the first and last threshold.
         continuous_state = []
         for idx, bins in zip(bin_indices, self.state_bins):
             # bins is the thresholds array created with np.linspace(low, high, n_bins-1)
-            # Follow the old code's logic for center computation:
-            # - if idx == 0: center = bins[0] - (bins[1] - bins[0]) / 2
-            # - elif idx == len(bins): center = bins[-1] + (bins[-1] - bins[-2]) / 2
-            # - else: center = (bins[idx-1] + bins[idx]) / 2
             if idx == 0:
                 # below first threshold: extrapolate half the first spacing
                 if len(bins) >= 2:
